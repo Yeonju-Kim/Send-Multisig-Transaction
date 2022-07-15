@@ -32,7 +32,12 @@ function App() {
     }
     
     const newKeyring = caver.wallet.keyring.createWithMultipleKey(sender, newKeys)
-    caver.wallet.add(newKeyring) // caver wallet add keyring if keyring hasn't been updated. 
+    if (caver.wallet.isExisted(sender)){
+      caver.wallet.updateKeyring(newKeyring)
+    }
+    else{
+      caver.wallet.add(newKeyring) // caver wallet add keyring if keyring hasn't been updated. 
+    }
 
     const vt = caver.transaction.valueTransfer.create({
       from: sender,
@@ -63,7 +68,7 @@ function App() {
   }
 
   const onFileAndPasswordUpload = (e, index)=>{
-    //decrypt 
+    //decrypt and add priv key to PrivKey list
     const keyring = caver.wallet.keyring.decrypt(keystoreList[index].keystore, passwordList[index].password)
     const list = [...privateKeyList];
     list[index]["key"] = keyring.key.privateKey;
