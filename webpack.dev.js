@@ -11,7 +11,7 @@ module.exports = merge(baseConfig, {
   output: {
     filename: '[name].bundle.js',
     publicPath: '/',
-    path: path.resolve(__dirname, 'dist'),
+    path: path.resolve(__dirname, 'build'),
   },
   devServer: devServerConfig,
   module: {
