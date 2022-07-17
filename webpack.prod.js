@@ -21,7 +21,7 @@ module.exports = merge(baseConfig, {
     filename: '[name].[hash].bundle.js',
     chunkFilename: '[name].[chunkhash].js',
     publicPath: '/',
-    path: path.resolve(__dirname, 'dist'),
+    path: path.resolve(__dirname, 'build'),
   },
   module: {
     rules: [
@@ -51,11 +51,11 @@ module.exports = merge(baseConfig, {
     fs: 'empty',
    },
   plugins: [
-    new CleanWebpackPlugin('dist', { root: __dirname }),
+    new CleanWebpackPlugin('build', { root: __dirname }),
     new OptimizeCssAssetsPlugin(),
     new CopyWebpackPlugin([{
       from: path.resolve(__dirname, 'public'),
-      to: path.resolve(__dirname, 'dist'),
+      to: path.resolve(__dirname, 'build'),
       ignore: ['*.ejs'],
     }]),
     new DefinePlugin({
