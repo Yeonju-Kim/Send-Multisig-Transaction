@@ -50,7 +50,7 @@
   },
   "scripts": {
     "build": "webpack --config ./webpack.prod.js",
-    "start": "serve ./dist -p 5555",
+    "start": "serve ./build -p 5555",
     "local": "webpack-dev-server --config webpack.dev.js",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d build"
