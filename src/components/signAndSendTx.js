@@ -29,17 +29,18 @@ class SendAndSignTx extends Component {
     constructor(props){
         super(props);
         this.state = {
-            error: null,
-            success: null,
+            signAndSendMsg: null,
+            txHash: null,
             sender:"",
             recipient: "",
             amount: 0,
             buttonDisabled: false,
             rawTransaction: null,
-            keystoreList: [{keystore: ""}],
-            passwordList: [{password: ""}],
-            decryptMessageList: [{msg: ""}],
-            privateKeyList: [{key: ""}],
+            keystoreJSON: null,
+            keystorePassword: "",
+            decryptMessage: "",
+            privateKeyList: [],
+            decryptMessageVisible: false,
             network: "mainnet"
         }
     }
@@ -55,95 +56,75 @@ class SendAndSignTx extends Component {
         })
     }
 
-    handleKeystoreChange = (e, index) => {
+    handleKeystoreChange = (e) => {
         if (e.target.files.length > 0)
         {
-            const {name} = e.target;
-            const list = [...this.state.keystoreList];
+            const filename = e.target.files[0].name            
             const fileReader = new FileReader();
             fileReader.readAsText(e.target.files[0], "UTF-8")
-            fileReader.onload =  (event) =>{
-                list[index][name]= JSON.parse(event.target.result)
+            fileReader.onload = (event) =>{
+                const parsedKeystore = JSON.parse(event.target.result)
                 this.setState({
-                    keystoreList: list
+                    keystoreFileName: filename, 
+                    keystoreJSON: parsedKeystore,
                 })
             };
         }
     }
     
-    handlePasswordChange = (e, index)=>{
-        const {name, value} = e.target;
-        const list = [...this.state.passwordList];
-        list[index][name]= value;
+    handlePasswordChange = (e)=>{
+        const {value} = e.target;        
         this.setState({
-            passwordList:list
+            keystorePassword: value
         })
     }
     
-    onFileAndPasswordUpload = (e, index)=>{
+    onFileAndPasswordUpload = (e)=>{
         //decrypt and add priv key to PrivKey list
-        const {keystoreList, passwordList, privateKeyList, decryptMessageList} = this.state
+        const {privateKeyList, keystoreFileName, keystoreJSON, keystorePassword} = this.state
         try {
-            if (keystoreList[index].keystore != "")
+            if (keystoreJSON != null)
             {
-                const keyring = caver.wallet.keyring.decrypt(keystoreList[index].keystore, passwordList[index].password)
-                const list = [...privateKeyList];
-                list[index]["key"] = keyring.key.privateKey;
-            
-                const decryptMsgList = [...decryptMessageList];
-                decryptMsgList[index]["msg"] = "Decryption succeeds!"; 
-
+                const keyring = caver.wallet.keyring.decrypt(keystoreJSON, keystorePassword)
+                const list = [...privateKeyList, {"key": keyring.key.privateKey, "fileName": keystoreFileName}]
                 this.setState({
                     privateKeyList: list,
-                    decryptMessageList: decryptMsgList
+                    keystoreFileName: "",
+                    keystoreJSON: null,
+                    keystorePassword: "",
+                    decryptMessage: "Decryption succeed!"
                 })
+
+                setTimeout(()=>{
+                    this.setState({
+                        decryptMessageVisible: false,
+                        decryptMessage: ""
+                    })
+                }, 5000)
             }
-        } catch (e) {
+        }catch (e){
             console.log(e)
-            const decryptMsgList = [...decryptMessageList];
-            decryptMsgList[index]["msg"] = e.toString(); 
             this.setState({
-                decryptMessageList: decryptMsgList,
+                decryptMessage: e.toString(),
+                decryptMessageVisible: true,
             })
+            setTimeout(()=>{
+                this.setState({
+                    decryptMessageVisible: false,
+                    decryptMessage: ""
+                })
+            }, 5000)
         }
     }
 
     handleKeystoreRemove = (index) => {
-        const {keystoreList, passwordList, privateKeyList, decryptMessageList} = this.state
-
-        const list =[...keystoreList]
-        list.splice(index, 1);
-    
-        const pwList = [...passwordList]
-        pwList.splice(index, 1);
+        const {privateKeyList} = this.state
     
         const privKeyList = [...privateKeyList]
         privKeyList.splice(index, 1);
-    
-        const decryptMsgList = [...decryptMessageList]
-        decryptMsgList.splice(index, 1);
 
         this.setState({
-            keystoreList: list,
-            passwordList: pwList,
             privateKeyList: privKeyList,
-            decryptMessageList: decryptMsgList
-        })
-    }
-      
-    handleKeystoreAdd = ()=>{
-        this.setState(state => {
-            const keystoreList = [...state.keystoreList, {keystore: ""}]
-            const passwordList = [...state.passwordList, {password: ""}]
-            const privateKeyList = [...state.privateKeyList, {key: ""}]
-            const decryptMessageList = [...state.decryptMessageList, {msg: ""}]
-
-            return{
-                keystoreList, 
-                passwordList,
-                privateKeyList,
-                decryptMessageList
-            };
         })
     }
 
@@ -151,8 +132,10 @@ class SendAndSignTx extends Component {
         const { name, value } = e.target;
         this.setState({
             [name]: value,
-            error: null,
-            success: null,
+            sendAndSignMsg: null,
+            txHash: null,
+            rawTransaction: null,
+            buttonDisabled: false,
         })
     }
 
@@ -160,20 +143,24 @@ class SendAndSignTx extends Component {
         try{
             this.setState({
                 buttonDisabled: true,
-                error: null, 
-                success: null,
+                sendAndSignMsg: null, 
+                txHash: null,
             })
             const vtReceipt = await caver.rpc.klay.sendRawTransaction(this.state.rawTransaction)
             console.log(`Receipt of value transfer transaction after account update => `)
             console.log(vtReceipt)
             this.setState({
-                success: vtReceipt.transactionHash,
+                sendAndSignMsg: "Transaction is confirmed!",
                 buttonDisabled: false,
+                rawTransaction: null,
+                txHash: vtReceipt.transactionHash,
             })
         } catch(e){
+            //Raw transaction is not changed once error occurs during sending tx. 
             this.setState({
-                error: e.toString(),
+                sendAndSignMsg: e.toString(),
                 buttonDisabled: false,
+                txHash: null,
             })
         }
      }
@@ -184,8 +171,9 @@ class SendAndSignTx extends Component {
             const {sender, recipient, amount} = this.state
             this.setState({
                 buttonDisabled: true,
-                error: null, 
-                success: null,
+                sendAndSignMsg: null,
+                txHash: null,
+                rawTransaction: null,
             })
             let newKeys = []
             for (const element of this.state.privateKeyList)
@@ -207,23 +195,26 @@ class SendAndSignTx extends Component {
                 value: amount,
                 gas: 100000,
             })
+
             let signed = await caver.wallet.sign(sender, vt)
             this.setState({
                 rawTransaction: signed.getRawTransaction(),
-                success: signed.getTransactionHash(),
+                sendAndSignMsg: "Transaction is signed!", 
+                txHash: signed.getTransactionHash(),
                 buttonDisabled: false
             })
         } catch(e){
             this.setState({
-                buttonDisabled:false ,
-                error: e.toString()
+                buttonDisabled: false ,
+                sendAndSignMsg: e.toString(),
+                txHash: null,
+                rawTransaction: null,
             })
         }
-  }
-  
+    }
 
     render(){
-        const {error, network, buttonDisabled, success, sender, recipient, amount, keystoreList, passwordList, decryptMessageList} = this.state
+        const {network, buttonDisabled, txHash, sendAndSignMsg, sender, recipient, amount, privateKeyList, decryptMessageVisible, keystorePassword, decryptMessage} = this.state        
         return (
             <div>
                 <Card>
@@ -281,14 +272,14 @@ class SendAndSignTx extends Component {
                         <Col md="8">
                             <Row>
                                 <Button disabled={buttonDisabled} onClick={this.onSignTxButtonClick}>Sign Transaction</Button> 
-                                <Button disabled={buttonDisabled} onClick={this.onSendTxButtonClick}>Send Transaction</Button>
+                                <Button disabled={buttonDisabled || this.state.rawTransaction == null} onClick={this.onSendTxButtonClick}>Send Transaction</Button>
                             </Row>
                             <Row>
-                                <CardText style={{display : error!=null? "inline":"none", backgroundColor:"black"}}>
-                                    {error}
+                                <CardText style={{display: sendAndSignMsg!=null && txHash==null? "inline" : "none", backgroundColor:"black"}}>
+                                    {sendAndSignMsg}
                                 </CardText>
-                                <CardText style={{display: success!= null ? "inline":"none"}}>
-                                    Transaction Hash: <a href={networkLinks[network]["finder"]+success}>{success}</a> 
+                                <CardText style={{display: sendAndSignMsg!=null && txHash!=null? "inline" : "none"}}>
+                                    {sendAndSignMsg} Transaction Hash: <a href={networkLinks[network]["finder"]+txHash}>{txHash}</a> 
                                 </CardText>
                             </Row>
                         </Col>
@@ -296,59 +287,71 @@ class SendAndSignTx extends Component {
                 </Card>
                 <Card>
                     <CardHeader>
-                    <h3 className="title">Upload Keystore files</h3>
-                    {keystoreList.length < 10 && (
-                        <Button
-                        type="button"
-                        onClick={this.handleKeystoreAdd}
-                        >
-                        Add a Keystore and Password
-                        </Button>
-                    )}              
+                        <h3 className="title">Decrypted Keystore List</h3>
                     </CardHeader>
                     <CardBody>
-                    {keystoreList.map((_, index) => (
-                        <div>
-                            <Row>
-                                <Col md="8">
-                                    <InputField
-                                        name="keystore"
-                                        type="file"
-                                        id="Keystore"
-                                        label="Keystore"
-                                        placeholder="Keystore File"
-                                        accept=".json"
-                                        onChange={(e) => this.handleKeystoreChange(e, index)}
-                                    />
-                                </Col>
-                            </Row>
-                            <Row>
-                                <Col md="8">
-                                    <InputField
-                                        type="password"
-                                        name="password"
-                                        placeholder="Password"
-                                        label="Password"
-                                        onChange={(e)=> this.handlePasswordChange(e, index)}
-                                        value={passwordList[index].password}
-                                    />
-                                </Col>
-                            </Row>
-                            <Row>
-                                <Col md="8">
-                                    <Button onClick={(e)=> this.onFileAndPasswordUpload(e,index)}>Upload</Button>
+                        <Row>
+                            <Col md = "8">
+                            {privateKeyList.map((_, index) => (
+                                privateKeyList[index]["key"] != "" &&
+                                <Row>
+                                    <Col md= "8">
+                                        <CardText>
+                                        {privateKeyList[index]["fileName"]}
+                                        </CardText>
+                                    </Col>
                                     <Button onClick={() => this.handleKeystoreRemove(index)}>Remove</Button>
-                                </Col>
-                            </Row>
-                            <Row>
-                                <Col md="8">
-                                    <CardText style={{color:"#c221a9"}}>
-                                        {decryptMessageList[index]["msg"]}
-                                    </CardText>
-                                </Col>
-                            </Row>
-                        </div>
-                    ))}
+                                </Row>
+                            ))}   
+                            </Col>
+                        </Row>
+
+                    </CardBody>
+
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <h3 className="title">Upload Keystore File</h3>
+                    </CardHeader>
+                    <CardBody>
+                    <Row>
+                        <Col md="8">
+                            <InputField
+                                name="keystore"
+                                type="file"
+                                id="Keystore"
+                                label="Keystore"
+                                placeholder="Keystore File"
+                                accept=".json"
+                                onChange={(e) => this.handleKeystoreChange(e)}
+                            />
+                        </Col>
+                    </Row>
+                    <Row>
+                        <Col md="8">
+                            <InputField
+                                type="password"
+                                name="password"
+                                placeholder="Password"
+                                label="Password"
+                                onChange={(e)=> this.handlePasswordChange(e)}
+                                value={keystorePassword}
+                            />
+                        </Col>
+                    </Row>
+                    <Row>
+                        <Col md="8">
+                            <Button onClick={(e)=> this.onFileAndPasswordUpload(e)}>Decrypt</Button>
+                        </Col>
+                    </Row>
+                        {decryptMessageVisible && 
+                        <Row>
+                            <Col md="8">
+                                <CardText style={{color:"#c221a9"}}>
+                                    {decryptMessage}
+                                </CardText>
+                            </Col>
+                        </Row>}
                     </CardBody>
                 </Card>
             </div>
