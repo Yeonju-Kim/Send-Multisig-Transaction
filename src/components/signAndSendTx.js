@@ -313,7 +313,7 @@ class SendAndSignTx extends Component {
                         <Row>
                             <Col md = "8">
                             {privateKeyList.map((_, index) => (
-                                privateKeyList[index]["key"] != "" &&
+                                privateKeyList[index]["key"].length > 0 &&
                                 <Row>
                                     <Col md= "8">
                                         <CardText>
