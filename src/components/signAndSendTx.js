@@ -86,13 +86,34 @@ class SendAndSignTx extends Component {
             if (keystoreJSON != null)
             {
                 const keyring = caver.wallet.keyring.decrypt(keystoreJSON, keystorePassword)
-                const list = [...privateKeyList, {"key": keyring.key.privateKey, "fileName": keystoreFileName}]
+                const keyList = []
+                if (keyring.type == "SingleKeyring")
+                {
+                    keyList.push(keyring.key.privateKey)
+                }
+                else if(keyring.type == "MultipleKeyring")
+                {   
+                    for (const element of keyring.keys)
+                    {
+                        keyList.push(element.privateKey)
+                    }
+                }
+                else if(keyring.type == "RoleBasedKeyring")
+                {
+                    const txRoleKeys = keyring.getKeyByRole(caver.wallet.keyring.role.roleTransactionKey)
+                    for (const element of txRoleKeys){
+                        keyList.push(element.privateKey)
+                    }
+                }
+
+                const list = [...privateKeyList, {"key": keyList, "fileName": keystoreFileName}]
                 this.setState({
                     privateKeyList: list,
                     keystoreFileName: "",
                     keystoreJSON: null,
                     keystorePassword: "",
-                    decryptMessage: "Decryption succeed!"
+                    decryptMessage: "Decryption succeeds!",
+                    decryptMessageVisible: true,
                 })
 
                 setTimeout(()=>{
@@ -100,7 +121,7 @@ class SendAndSignTx extends Component {
                         decryptMessageVisible: false,
                         decryptMessage: ""
                     })
-                }, 5000)
+                }, 3000)
             }
         }catch (e){
             console.log(e)
@@ -178,9 +199,8 @@ class SendAndSignTx extends Component {
             let newKeys = []
             for (const element of this.state.privateKeyList)
             {
-                newKeys.push(element.key)
+                newKeys.push(...element.key)
             }
-            
             const newKeyring = caver.wallet.keyring.createWithMultipleKey(sender, newKeys)
             if (caver.wallet.isExisted(sender)){
                 caver.wallet.updateKeyring(newKeyring)
@@ -305,9 +325,7 @@ class SendAndSignTx extends Component {
                             ))}   
                             </Col>
                         </Row>
-
                     </CardBody>
-
                 </Card>
                 <Card>
                     <CardHeader>
